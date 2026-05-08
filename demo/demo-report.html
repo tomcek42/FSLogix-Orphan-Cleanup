@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<title>FSLogix-Report (Demo)</title>
+<style>
+  :root { --del:#c0392b; --del-bg:#ffe1e1; --ok:#27ae60; --warn:#e67e22; --muted:#777; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", Arial, sans-serif; font-size: 13px; color: #222; margin: 16px 24px; background:#fafafa; }
+  h1 { font-size: 22px; margin: 0 0 4px 0; }
+  h2 { font-size: 15px; margin: 24px 0 8px 0; }
+  .meta { color: #555; margin-bottom: 14px; font-size: 12px; }
+  .meta span { display:inline-block; margin-right:18px; }
+  .tiles { display:flex; gap:10px; flex-wrap:wrap; margin: 14px 0 18px; }
+  .tile { background:#fff; border:1px solid #ddd; border-radius:6px; padding:10px 14px; min-width:150px; }
+  .tile .lbl { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; }
+  .tile .val { font-size:18px; font-weight:600; margin-top:2px; }
+  .tile.del .val { color:var(--del); }
+  .tile.ok  .val { color:var(--ok); }
+  .controls { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin: 8px 0 12px; }
+  .controls input[type="search"] { padding:6px 10px; border:1px solid #ccc; border-radius:4px; min-width:240px; font-size:13px; }
+  .btn { padding:5px 11px; border:1px solid #ccc; background:#fff; border-radius:4px; cursor:pointer; font-size:12px; }
+  .btn:hover { background:#f0f0f0; }
+  .btn.active { background:#2c3e50; color:#fff; border-color:#2c3e50; }
+  .btn.del { border-color:var(--del); color:var(--del); }
+  .btn.del.active { background:var(--del); color:#fff; }
+  .btn.ok { border-color:var(--ok); color:var(--ok); }
+  .btn.ok.active { background:var(--ok); color:#fff; }
+  table { border-collapse: collapse; width: 100%; background:#fff; }
+  th, td { padding: 6px 10px; border: 1px solid #e1e1e1; text-align: left; vertical-align: top; font-size:12.5px; }
+  th { background: #f0f0f0; position: sticky; top: 0; cursor:pointer; user-select:none; }
+  th:hover { background:#e6e6e6; }
+  th .arrow { color:#999; font-size:10px; margin-left:4px; }
+  tr.cb-yes td { background: var(--del-bg); }
+  tr.cb-yes td:first-child { border-left: 4px solid var(--del); }
+  tr:hover td { background: #eef6ff; }
+  tr.cb-yes:hover td { background: #ffd1d1; }
+  td.num { text-align:right; font-variant-numeric: tabular-nums; }
+  .footer { margin-top:24px; color:var(--muted); font-size:11px; }
+  .pill { display:inline-block; padding:1px 7px; border-radius:10px; font-size:11px; }
+  .pill.del { background:var(--del); color:#fff; }
+  .pill.ok  { background:var(--ok); color:#fff; }
+  .pill.warn{ background:var(--warn); color:#fff; }
+  .pill.muted { background:#bbb; color:#fff; }
+</style>
+</head><body>
+<h1>FSLogix Profile Report</h1>
+<div class="meta">
+  <span><b>Created:</b> 2026-05-08 14:32:11</span>
+  <span><b>ProfileRoot:</b> \\fileserver\FSLogix$</span>
+  <span><b>Search domain:</b> DC=contoso,DC=com</span>
+  <span><b>Domain SID:</b> S-1-5-21-1111111111-2222222222-3333333333</span>
+</div>
+<div class="tiles">
+  <div class="tile"><div class="lbl">Profiles (filtered)</div><div class="val" id="t-count">-</div></div>
+  <div class="tile"><div class="lbl">Size (filtered)</div><div class="val" id="t-size">-</div></div>
+  <div class="tile del"><div class="lbl">Deletable</div><div class="val" id="t-del">-</div></div>
+  <div class="tile del"><div class="lbl">Deletable size</div><div class="val" id="t-del-size">-</div></div>
+  <div class="tile ok"><div class="lbl">Active</div><div class="val" id="t-act">-</div></div>
+  <div class="tile ok"><div class="lbl">Active size</div><div class="val" id="t-act-size">-</div></div>
+</div>
+<div class="controls">
+  <button class="btn active" data-filter="all">All FSLogix-Folders</button>
+  <button class="btn del" data-filter="del">Deletable FSLogix-Folders</button>
+  <button class="btn ok"  data-filter="active">Active Accounts</button>
+  <button class="btn" data-filter="status:Deleted">Deleted AD-Accounts</button>
+  <button class="btn" data-filter="status:Disabled">Disabled AD-Accounts</button>
+  <button class="btn" data-filter="status:Renamed">Renamed AD-Accounts</button>
+  <button class="btn" data-filter="status:ADError">ADError</button>
+  <input type="search" id="q" placeholder="Search (folder / sAMAccountName)..." />
+</div>
+<table id="tbl">
+<thead><tr>
+<th data-col='Status'>Status<span class='arrow'>&#8597;</span></th>
+<th data-col='CanBeDeleted'>CanBeDeleted<span class='arrow'>&#8597;</span></th>
+<th data-col='FolderName'>FolderName<span class='arrow'>&#8597;</span></th>
+<th data-col='SamFromFolder'>SamFromFolder<span class='arrow'>&#8597;</span></th>
+<th data-col='CurrentSamInAD'>CurrentSamInAD<span class='arrow'>&#8597;</span></th>
+<th data-col='ADEnabled'>ADEnabled<span class='arrow'>&#8597;</span></th>
+<th data-col='LastLogonDate'>LastLogonDate<span class='arrow'>&#8597;</span></th>
+<th data-col='FolderLastWrite'>FolderLastWrite<span class='arrow'>&#8597;</span></th>
+<th data-col='SizeGB'>SizeGB<span class='arrow'>&#8597;</span></th>
+</tr></thead><tbody>
+<tr class='cb-yes' data-status='Deleted' data-cb='Yes' data-bytes='3221225472'><td><span class='pill del'>Deleted</span></td><td>Yes - Deleted</td><td>jsmith_S-1-5-21-1111111111-2222222222-3333333333-1042</td><td>jsmith</td><td></td><td></td><td></td><td>11.04.2025 09:14:22</td><td class='num'>3,00</td></tr>
+<tr class='cb-yes' data-status='Deleted' data-cb='Yes' data-bytes='15032385536'><td><span class='pill del'>Deleted</span></td><td>Yes - Deleted</td><td>rpark_S-1-5-21-1111111111-2222222222-3333333333-1093</td><td>rpark</td><td></td><td></td><td></td><td>14.08.2025 13:27:39</td><td class='num'>14,00</td></tr>
+<tr class='cb-yes' data-status='Disabled' data-cb='Yes' data-bytes='6442450944'><td><span class='pill del'>Disabled</span></td><td>Yes - Disabled</td><td>fbecker_S-1-5-21-1111111111-2222222222-3333333333-1145</td><td>fbecker</td><td>fbecker</td><td>False</td><td>02.02.2026 10:11:22</td><td>05.02.2026 09:23:18</td><td class='num'>6,00</td></tr>
+<tr class='cb-yes' data-status='Disabled' data-cb='Yes' data-bytes='12884901888'><td><span class='pill del'>Disabled</span></td><td>Yes - Disabled</td><td>ssorensen_S-1-5-21-1111111111-2222222222-3333333333-1162</td><td>ssorensen</td><td>ssorensen</td><td>False</td><td>21.02.2026 14:05:49</td><td>03.03.2026 16:48:33</td><td class='num'>12,00</td></tr>
+<tr class='cb-yes' data-status='Disabled' data-cb='Yes' data-bytes='4294967296'><td><span class='pill del'>Disabled</span></td><td>Yes - Disabled</td><td>hyamamoto_S-1-5-21-1111111111-2222222222-3333333333-1178</td><td>hyamamoto</td><td>hyamamoto</td><td>False</td><td>17.03.2026 09:32:01</td><td>20.03.2026 08:14:55</td><td class='num'>4,00</td></tr>
+<tr class='cb-yes' data-status='Renamed' data-cb='Yes' data-bytes='7516192768'><td><span class='pill warn'>Renamed</span></td><td>Yes - Renamed</td><td>jmiller_S-1-5-21-1111111111-2222222222-3333333333-1196</td><td>jmiller</td><td>jschmidt</td><td>True</td><td>06.05.2026 08:22:14</td><td>11.10.2025 17:04:29</td><td class='num'>7,00</td></tr>
+<tr class='cb-yes' data-status='Renamed' data-cb='Yes' data-bytes='10737418240'><td><span class='pill warn'>Renamed</span></td><td>Yes - Renamed</td><td>lkowalski_S-1-5-21-1111111111-2222222222-3333333333-1201</td><td>lkowalski</td><td>lwozniak</td><td>True</td><td>07.05.2026 12:44:38</td><td>23.11.2025 14:35:17</td><td class='num'>10,00</td></tr>
+<tr class='cb-yes' data-status='Renamed' data-cb='Yes' data-bytes='3758096384'><td><span class='pill warn'>Renamed</span></td><td>Yes - Renamed</td><td>cmueller_S-1-5-21-1111111111-2222222222-3333333333-1215</td><td>cmueller</td><td>cmuller</td><td>True</td><td>08.05.2026 07:16:52</td><td>04.01.2026 10:52:08</td><td class='num'>3,50</td></tr>
+<tr class='cb-no' data-status='ADError' data-cb='No' data-bytes='2147483648'><td><span class='pill muted'>ADError</span></td><td>No</td><td>xunknown_S-1-5-21-1111111111-2222222222-3333333333-1228</td><td>xunknown</td><td></td><td></td><td></td><td>12.04.2026 11:23:09</td><td class='num'>2,00</td></tr>
+<tr class='cb-no' data-status='Active' data-cb='No' data-bytes='5368709120'><td><span class='pill ok'>Active</span></td><td>No</td><td>asanchez_S-1-5-21-1111111111-2222222222-3333333333-1011</td><td>asanchez</td><td>asanchez</td><td>True</td><td>08.05.2026 06:48:21</td><td>08.05.2026 06:48:33</td><td class='num'>5,00</td></tr>
+<tr class='cb-no' data-status='Active' data-cb='No' data-bytes='8053063680'><td><span class='pill ok'>Active</span></td><td>No</td><td>bkim_S-1-5-21-1111111111-2222222222-3333333333-1024</td><td>bkim</td><td>bkim</td><td>True</td><td>08.05.2026 07:12:44</td><td>08.05.2026 07:13:01</td><td class='num'>7,50</td></tr>
+<tr class='cb-no' data-status='Active' data-cb='No' data-bytes='4294967296'><td><span class='pill ok'>Active</span></td><td>No</td><td>chernandez_S-1-5-21-1111111111-2222222222-3333333333-1033</td><td>chernandez</td><td>chernandez</td><td>True</td><td>08.05.2026 08:01:09</td><td>08.05.2026 08:02:15</td><td class='num'>4,00</td></tr>
+<tr class='cb-no' data-status='Active' data-cb='No' data-bytes='12884901888'><td><span class='pill ok'>Active</span></td><td>No</td><td>dmurphy_S-1-5-21-1111111111-2222222222-3333333333-1047</td><td>dmurphy</td><td>dmurphy</td><td>True</td><td>08.05.2026 08:34:55</td><td>08.05.2026 08:35:18</td><td class='num'>12,00</td></tr>
+<tr class='cb-no' data-status='Active' data-cb='No' data-bytes='6442450944'><td><span class='pill ok'>Active</span></td><td>No</td><td>fokafor_S-1-5-21-1111111111-2222222222-3333333333-1068</td><td>fokafor</td><td>fokafor</td><td>True</td><td>08.05.2026 09:55:13</td><td>08.05.2026 09:56:40</td><td class='num'>6,00</td></tr>
+<tr class='cb-no' data-status='Active' data-cb='No' data-bytes='9126805504'><td><span class='pill ok'>Active</span></td><td>No</td><td>gtanaka_S-1-5-21-1111111111-2222222222-3333333333-1082</td><td>gtanaka</td><td>gtanaka</td><td>True</td><td>08.05.2026 10:24:38</td><td>08.05.2026 10:25:11</td><td class='num'>8,50</td></tr>
+</tbody></table>
+<h2>Status summary</h2>
+<table style="width:auto"><thead><tr><th>Status</th><th>Count</th></tr></thead><tbody>
+<tr><td>Active</td><td class='num'>6</td></tr>
+<tr><td>ADError</td><td class='num'>1</td></tr>
+<tr><td>Deleted</td><td class='num'>2</td></tr>
+<tr><td>Disabled</td><td class='num'>3</td></tr>
+<tr><td>Renamed</td><td class='num'>3</td></tr>
+</tbody></table>
+<h2>Domain SID inventory (all profiles)</h2>
+<table style="width:auto"><thead><tr><th>Domain SID</th><th>Profiles</th><th>Match search domain?</th></tr></thead><tbody>
+<tr><td>S-1-5-21-1111111111-2222222222-3333333333</td><td class='num'>15</td><td>YES</td></tr>
+</tbody></table>
+<div class="footer">Tip: click a column header to sort. Filters and search combine.</div>
+<script>
+(function () {
+  const tbody = document.querySelector('#tbl tbody');
+  const rows  = Array.from(tbody.querySelectorAll('tr'));
+  const tiles = {
+    count: document.getElementById('t-count'),
+    size:  document.getElementById('t-size'),
+    del:   document.getElementById('t-del'),
+    delS:  document.getElementById('t-del-size'),
+    act:   document.getElementById('t-act'),
+    actS:  document.getElementById('t-act-size'),
+  };
+  const buttons = document.querySelectorAll('.btn[data-filter]');
+  const search  = document.getElementById('q');
+  let activeFilter = 'all';
+
+  function fmtSize(bytes) {
+    if (!bytes) return '0 GB';
+    const gb = bytes / (1024**3);
+    if (gb >= 1) return gb.toFixed(2) + ' GB';
+    const mb = bytes / (1024**2);
+    return mb.toFixed(0) + ' MB';
+  }
+
+  function matchFilter(tr) {
+    if (activeFilter === 'all') return true;
+    if (activeFilter === 'del') return tr.dataset.cb === 'Yes';
+    if (activeFilter === 'active') return tr.dataset.status === 'Active';
+    if (activeFilter.startsWith('status:')) {
+      return tr.dataset.status === activeFilter.slice(7);
+    }
+    return true;
+  }
+  function matchSearch(tr) {
+    const q = (search.value || '').trim().toLowerCase();
+    if (!q) return true;
+    return tr.textContent.toLowerCase().includes(q);
+  }
+
+  function recompute() {
+    let count = 0, size = 0, delC = 0, delS = 0, actC = 0, actS = 0;
+    for (const tr of rows) {
+      const visible = matchFilter(tr) && matchSearch(tr);
+      tr.style.display = visible ? '' : 'none';
+      if (!visible) continue;
+      const b = parseFloat(tr.dataset.bytes) || 0;
+      count++; size += b;
+      if (tr.dataset.cb === 'Yes') { delC++; delS += b; }
+      if (tr.dataset.status === 'Active') { actC++; actS += b; }
+    }
+    tiles.count.textContent = count.toLocaleString('de-DE');
+    tiles.size.textContent  = fmtSize(size);
+    tiles.del.textContent   = delC.toLocaleString('de-DE');
+    tiles.delS.textContent  = fmtSize(delS);
+    tiles.act.textContent   = actC.toLocaleString('de-DE');
+    tiles.actS.textContent  = fmtSize(actS);
+  }
+
+  buttons.forEach(b => b.addEventListener('click', () => {
+    buttons.forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    activeFilter = b.dataset.filter;
+    recompute();
+  }));
+  search.addEventListener('input', recompute);
+
+  const ths = document.querySelectorAll('#tbl thead th');
+  ths.forEach((th, i) => th.addEventListener('click', () => {
+    const dir = th.dataset.dir === 'asc' ? 'desc' : 'asc';
+    ths.forEach(x => x.dataset.dir = '');
+    th.dataset.dir = dir;
+    const isNum = th.dataset.col === 'SizeGB';
+    const isDate = th.dataset.col === 'LastLogonDate' || th.dataset.col === 'FolderLastWrite';
+    const sorted = rows.slice().sort((a, b) => {
+      let av = a.children[i].textContent.trim();
+      let bv = b.children[i].textContent.trim();
+      if (isNum)  { av = parseFloat(av.replace(',', '.')) || 0; bv = parseFloat(bv.replace(',', '.')) || 0; }
+      if (isDate) { av = Date.parse(av.split('.').reverse().join('-')) || 0; bv = Date.parse(bv.split('.').reverse().join('-')) || 0; }
+      if (av < bv) return dir === 'asc' ? -1 : 1;
+      if (av > bv) return dir === 'asc' ?  1 : -1;
+      return 0;
+    });
+    sorted.forEach(r => tbody.appendChild(r));
+  }));
+
+  recompute();
+})();
+</script>
+</body></html>

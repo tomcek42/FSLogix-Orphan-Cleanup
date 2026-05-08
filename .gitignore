@@ -1,0 +1,10 @@
+# Generated reports — contain real sAMAccountNames and SIDs
+FSLogix-Inventory-*.csv
+FSLogix-Report-*.csv
+FSLogix-Report-*.html
+FSLogix-Move-*.log.csv
+
+# Local Claude / editor state
+.claude/
+.vscode/
+*.tmp
